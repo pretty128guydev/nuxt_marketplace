@@ -82,7 +82,7 @@ export const products = [
       name: 'Product 7',
       description: 'This is product 2',
       price: 50.0,
-      quantity:2,
+      quantity:7,
       properties: {
         color: 'blue',
         size: 'L',
@@ -95,7 +95,7 @@ export const products = [
       name: 'Product 8',
       description: 'This is product 2',
       price: 50.0,
-      quantity:6,
+      quantity:9,
       properties: {
         color: 'blue',
         size: 'L',

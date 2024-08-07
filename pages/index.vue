@@ -40,23 +40,45 @@
       </div>
     </div>
 
+    <!-- Loading Indicator -->
+    <div v-if="isLoading" class="text-center text-gray-600">Loading...</div>
+
+    <!-- No Data Indicator -->
+    <div v-else-if="!filteredProducts.length" class="text-center text-gray-600">
+      No products found.
+    </div>
+
     <!-- Product List -->
-    <ul v-if="paginatedProducts.length" class="space-y-6">
+    <ul v-else class="space-y-6">
       <li
         v-for="product in paginatedProducts"
         :key="product.id"
-        class="bg-white shadow-md rounded-lg p-4 flex justify-between items-center border border-gray-200"
+        class="bg-white shadow-md rounded-lg p-4 flex items-center border border-gray-200"
       >
-        <NuxtLink
-          :to="`/product/${product.id}`"
-          class="text-xl font-semibold text-blue-600 hover:underline"
+        <img
+          :src="product.image"
+          alt="Product Image"
+          class="w-24 h-24 object-cover rounded-lg mr-4"
+        />
+        <div class="flex-grow">
+          <NuxtLink
+            :to="`/product/${product.id}`"
+            class="text-xl font-semibold text-blue-600 hover:underline"
+          >
+            {{ product.name }}
+          </NuxtLink>
+          <span class="text-gray-600 block"
+            >${{ product.price.toFixed(2) }}</span
+          >
+        </div>
+        <button
+          @click="goToProduct(product.id)"
+          class="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
         >
-          {{ product.name }}
-        </NuxtLink>
-        <span class="text-gray-600">${{ product.price.toFixed(2) }}</span>
+          View Product
+        </button>
       </li>
     </ul>
-    <p v-else class="text-center text-gray-600">No products found.</p>
 
     <!-- Pagination Controls -->
     <div class="mt-8 flex justify-between items-center">
@@ -81,14 +103,30 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useRouter } from "vue-router";
 
 const currentPage = ref(1);
 const itemsPerPage = 3;
 const filters = ref({ quantityRange: "", priceRange: "" });
 const products = ref<
-  Array<{ id: number; name: string; price: number; quantity: number }>
+  Array<{
+    id: number;
+    name: string;
+    price: number;
+    quantity: number;
+    image: string;
+  }>
 >([]);
+const cart = ref<Array<{ id: number; quantity: number }>>([]);
+const isLoading = ref(true);
+const router = useRouter();
 
+// Fetch cart contents from localStorage
+const fetchCart = () => {
+  cart.value = JSON.parse(localStorage.getItem("cart") || "[]");
+};
+
+// Fetch products from API
 const fetchProducts = async () => {
   try {
     const response = await fetch("/api/products");
@@ -105,7 +143,10 @@ const fetchProducts = async () => {
 };
 
 onMounted(async () => {
+  isLoading.value = true;
   products.value = await fetchProducts();
+  fetchCart();
+  isLoading.value = false;
 });
 
 watch(
@@ -115,7 +156,10 @@ watch(
     () => filters.value.priceRange,
   ],
   async () => {
+    isLoading.value = true;
     products.value = await fetchProducts();
+    fetchCart();
+    isLoading.value = false;
   }
 );
 
@@ -140,11 +184,16 @@ const filteredProducts = computed(() => {
     : [0, Infinity];
 
   return products.value.filter((product) => {
+    const cartItem = cart.value.find((item) => item.id === product.id);
+    const cartQuantity = cartItem ? cartItem.quantity : 0;
+    const availableQuantity = Math.max(0, product.quantity - cartQuantity);
+
     const isInQuantityRange =
-      product.quantity >= minQuantity &&
-      (maxQuantity === Infinity || product.quantity <= maxQuantity);
+      availableQuantity >= minQuantity &&
+      (maxQuantity === Infinity || availableQuantity <= maxQuantity);
     const isInPriceRange =
       product.price >= priceMin && product.price <= priceMax;
+
     return isInQuantityRange && isInPriceRange;
   });
 });
@@ -170,6 +219,10 @@ function nextPage() {
     currentPage.value += 1;
   }
 }
+
+function goToProduct(productId: number) {
+  router.push(`/product/${productId}`);
+}
 </script>
 
 <style scoped>
@@ -193,5 +246,14 @@ li {
 li:hover {
   transform: translateY(-4px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+button {
+  @apply px-4 py-2 rounded;
 }
 </style>
