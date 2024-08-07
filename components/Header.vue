@@ -19,10 +19,8 @@
   </template>
   
   <script setup lang="ts">
-  // No script needed for this simple header
   </script>
   
   <style scoped>
-  /* Optional: Add any additional styling here */
   </style>
   

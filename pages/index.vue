@@ -1,20 +1,25 @@
 <template>
   <div
-    class="container mx-auto p-4 flex flex-col justify-between h-calc-100-minus-100px"
+    class="container mx-auto p-4 flex flex-col justify-between h-[calc(100%-100px)]"
   >
     <h1 class="text-4xl font-bold mb-8">Product List</h1>
 
     <!-- Filters -->
     <div class="mb-8 flex gap-4">
       <div class="flex-1">
-        <label for="category" class="block text-lg font-medium mb-2"
-          >Category:</label
+        <label for="quantityRange" class="block text-lg font-medium mb-2"
+          >Quantity Range:</label
         >
-        <select v-model="filters.category" id="category" class="form-select">
+        <select
+          v-model="filters.quantityRange"
+          id="quantityRange"
+          class="form-select"
+        >
           <option value="">All</option>
-          <option value="electronics">Electronics</option>
-          <option value="furniture">Furniture</option>
-          <!-- Add more options here -->
+          <option value="0-5">0 ~ 5</option>
+          <option value="5-10">5 ~ 10</option>
+          <option value="10-15">10 ~ 15</option>
+          <option value="15+">15+</option>
         </select>
       </div>
 
@@ -27,11 +32,10 @@
           id="priceRange"
           class="form-select"
         >
-          <option value="0-200">All</option>
+          <option value="">All</option>
           <option value="0-50">0-50</option>
           <option value="50-100">50-100</option>
           <option value="100-200">100-200</option>
-          <!-- Add more options here -->
         </select>
       </div>
     </div>
@@ -76,82 +80,96 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
-import { useFetch } from "#imports";
+import { ref, computed, watch, onMounted } from "vue";
 
 const currentPage = ref(1);
-const itemsPerPage = 10;
-const filters = ref({ category: "", priceRange: "" });
+const itemsPerPage = 3;
+const filters = ref({ quantityRange: "", priceRange: "" });
+const products = ref<
+  Array<{ id: number; name: string; price: number; quantity: number }>
+>([]);
 
-// Fetch products from the API
 const fetchProducts = async () => {
   try {
-    const { data } = await useFetch("/api/products", {
-      params: {
-        page: currentPage.value,
-        limit: itemsPerPage, // Server-side pagination
-        category: filters.value.category,
-      },
-    });
-
-    console.log("Fetched products:", data.value); // Debugging line
-    return data.value || [];
+    const response = await fetch("/api/products");
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log("Fetched products:", data);
+    return data || [];
   } catch (error) {
-    console.error("Error fetching products:", error); // Debugging line
+    console.error("Error fetching products:", error);
     return [];
   }
 };
 
-// Products list including initial fetch
-const products = ref<Array<{ id: number; name: string; price: number }>>([]);
+onMounted(async () => {
+  products.value = await fetchProducts();
+});
 
-// Fetch products whenever page or filters change
 watch(
-  [currentPage, () => filters.value.category, () => filters.value.priceRange],
+  [
+    currentPage,
+    () => filters.value.quantityRange,
+    () => filters.value.priceRange,
+  ],
   async () => {
     products.value = await fetchProducts();
   }
 );
 
-// Filter products based on price range
 const filteredProducts = computed(() => {
-  if (!filters.value.priceRange) return products.value;
+  if (!filters.value.quantityRange && !filters.value.priceRange) {
+    return products.value;
+  }
 
-  const [minPrice, maxPrice] = filters.value.priceRange.split("-").map(Number);
+  let minQuantity = 0;
+  let maxQuantity = Infinity;
 
-  return products.value.filter(
-    (product) => product.price >= minPrice && product.price <= maxPrice
-  );
+  if (filters.value.quantityRange === "15+") {
+    minQuantity = 15;
+  } else if (filters.value.quantityRange) {
+    [minQuantity, maxQuantity] = filters.value.quantityRange
+      .split("-")
+      .map(Number);
+  }
+
+  const [priceMin, priceMax] = filters.value.priceRange
+    ? filters.value.priceRange.split("-").map(Number)
+    : [0, Infinity];
+
+  return products.value.filter((product) => {
+    const isInQuantityRange =
+      product.quantity >= minQuantity &&
+      (maxQuantity === Infinity || product.quantity <= maxQuantity);
+    const isInPriceRange =
+      product.price >= priceMin && product.price <= priceMax;
+    return isInQuantityRange && isInPriceRange;
+  });
 });
 
-// Paginate filtered products
 const paginatedProducts = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage;
   const end = start + itemsPerPage;
   return filteredProducts.value.slice(start, end);
 });
 
-// Calculate total pages based on filtered products
 const totalPages = computed(() =>
   Math.ceil(filteredProducts.value.length / itemsPerPage)
 );
 
-// Handle previous page action
 function previousPage() {
   if (currentPage.value > 1) {
     currentPage.value -= 1;
   }
 }
 
-// Handle next page action
 function nextPage() {
   if (currentPage.value < totalPages.value) {
     currentPage.value += 1;
   }
 }
-
-// Fetch products initially
-await fetchProducts();
 </script>
 
 <style scoped>
