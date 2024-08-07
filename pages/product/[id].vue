@@ -138,7 +138,6 @@ watch(
 </script>
 
 <style scoped>
-/* Add any scoped styles here */
 .disabled\:opacity-50 {
   opacity: 0.5;
 }
